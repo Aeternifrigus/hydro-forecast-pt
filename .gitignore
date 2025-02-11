@@ -1,0 +1,82 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Data (DVC-tracked) - DVC files should be committed, cache should not
+data/raw/
+data/interim/
+data/features/
+*.nc
+*.grib
+*.tif
+*.tiff
+
+# Models and outputs
+models/
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+
+# MLflow
+mlruns/
+mlflow.db
+mlflow.log
+
+# DVC - ignore cache, track pipeline files
+.dvc/cache
+.dvc/tmp
+.dvc/lock
+.dvcignore
+# dvc.lock and dvc.yaml SHOULD be committed
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# Streamlit
+.streamlit/
+
+# Temporary
+tmp/
+temp/
