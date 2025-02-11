@@ -1,0 +1,26 @@
+# .pre-commit-config.yaml
+# Generated for commit: Initial project structure: hydro-forecast-ch with src/hydro_forecast_pt layout, 
+
+# 2025-02-13: Chore: CI pipeline tweaks
+
+# 2025-02-15: Chore: linting config updates
+
+# 2025-02-23: Chore: update dependencies
+
+# 2025-03-08: Chore: update dependencies
+
+# 2025-03-27: Chore: CI pipeline tweaks
+
+# 2025-03-30: Chore: pre-commit hook adjustments
+
+# 2026-08-13: Chore: CI pipeline tweaks
+
+# 2026-08-23: Chore: pre-commit hook adjustments
+
+# 2026-09-03: Chore: update dependencies
+
+# 2026-09-06: Chore: linting config updates
+
+# 2026-09-13: Chore: update dependencies
+
+# 2026-10-17: Chore: pre-commit hook adjustments
