@@ -1,0 +1,154 @@
+# config/base.yaml
+# Generated for commit: Config system: YAML-based configuration with Pydantic validation for models, dat
+
+# 2025-02-08: Config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3 for champion criteria
+
+# 2025-02-16: Add config for feature selection: MI k=150, VIF<10, drop constant
+
+# 2025-02-22: Add config for drift thresholds: PSI bins=10, threshold=0.2, ref=52w
+
+# 2025-03-09: Add config for CV strategy: initial_train=104w, step=2w, gap=1w
+
+# 2025-03-14: Update config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2025-03-16: Add config for champion criteria: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2025-03-16: Add config for champion criteria: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2025-03-20: Config: PSI bins=10, threshold=0.2, ref=52w for drift thresholds
+
+# 2025-03-21: Update config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2025-03-21: Update config: MI k=150, VIF<10, drop constant
+
+# 2025-04-04: Config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3 for champion criteria
+
+# 2025-04-10: Add config for drift thresholds: PSI bins=10, threshold=0.2, ref=52w
+
+# 2025-04-10: Add config for champion criteria: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2025-04-11: Config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3 for champion criteria
+
+# 2025-04-11: Update config: initial_train=104w, step=2w, gap=1w
+
+# 2025-04-19: Config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3 for champion criteria
+
+# 2025-04-26: Config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3 for champion criteria
+
+# 2025-05-01: Update config: initial_train=104w, step=2w, gap=1w
+
+# 2025-05-03: Config: PSI bins=10, threshold=0.2, ref=52w for drift thresholds
+
+# 2025-05-08: Update config: initial_train=104w, step=2w, gap=1w
+
+# 2025-05-08: Update config: initial_train=104w, step=2w, gap=1w
+
+# 2025-05-22: Config: initial_train=104w, step=2w, gap=1w for CV strategy
+
+# 2025-05-30: Add config for CV strategy: initial_train=104w, step=2w, gap=1w
+
+# 2025-09-06: Add config for champion criteria: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2025-09-07: Add config for drift thresholds: PSI bins=10, threshold=0.2, ref=52w
+
+# 2025-09-13: Update config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2025-09-18: Update config: initial_train=104w, step=2w, gap=1w
+
+# 2025-09-21: Update config: MI k=150, VIF<10, drop constant
+
+# 2025-09-25: Add config for drift thresholds: PSI bins=10, threshold=0.2, ref=52w
+
+# 2025-10-03: Config: initial_train=104w, step=2w, gap=1w for CV strategy
+
+# 2025-10-03: Update config: MI k=150, VIF<10, drop constant
+
+# 2025-10-04: Update config: PSI bins=10, threshold=0.2, ref=52w
+
+# 2025-10-12: Add config for CV strategy: initial_train=104w, step=2w, gap=1w
+
+# 2025-10-12: Config: PSI bins=10, threshold=0.2, ref=52w for drift thresholds
+
+# 2025-10-18: Config: PSI bins=10, threshold=0.2, ref=52w for drift thresholds
+
+# 2025-10-18: Update config: PSI bins=10, threshold=0.2, ref=52w
+
+# 2025-10-31: Add config for feature selection: MI k=150, VIF<10, drop constant
+
+# 2026-02-01: Add config for drift thresholds: PSI bins=10, threshold=0.2, ref=52w
+
+# 2026-02-06: Add config for CV strategy: initial_train=104w, step=2w, gap=1w
+
+# 2026-02-07: Config: initial_train=104w, step=2w, gap=1w for CV strategy
+
+# 2026-02-08: Config: PSI bins=10, threshold=0.2, ref=52w for drift thresholds
+
+# 2026-02-28: Update config: MI k=150, VIF<10, drop constant
+
+# 2026-03-05: Update config: initial_train=104w, step=2w, gap=1w
+
+# 2026-03-06: Update config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2026-03-06: Add config for drift thresholds: PSI bins=10, threshold=0.2, ref=52w
+
+# 2026-03-14: Add config for feature selection: MI k=150, VIF<10, drop constant
+
+# 2026-03-15: Config: MI k=150, VIF<10, drop constant for feature selection
+
+# 2026-03-19: Config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3 for champion criteria
+
+# 2026-03-28: Config: MI k=150, VIF<10, drop constant for feature selection
+
+# 2026-03-28: Config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3 for champion criteria
+
+# 2026-04-09: Config: PSI bins=10, threshold=0.2, ref=52w for drift thresholds
+
+# 2026-04-11: Add config for champion criteria: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2026-04-12: Add config for feature selection: MI k=150, VIF<10, drop constant
+
+# 2026-04-17: Config: initial_train=104w, step=2w, gap=1w for CV strategy
+
+# 2026-04-19: Add config for champion criteria: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2026-04-26: Add config for feature selection: MI k=150, VIF<10, drop constant
+
+# 2026-05-09: Add config for CV strategy: initial_train=104w, step=2w, gap=1w
+
+# 2026-05-16: Config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3 for champion criteria
+
+# 2026-05-21: Add config for champion criteria: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2026-05-21: Update config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2026-05-23: Add config for champion criteria: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2026-05-24: Update config: PSI bins=10, threshold=0.2, ref=52w
+
+# 2026-06-12: Update config: MI k=150, VIF<10, drop constant
+
+# 2026-06-21: Update config: initial_train=104w, step=2w, gap=1w
+
+# 2026-06-21: Config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3 for champion criteria
+
+# 2026-07-02: Add config for drift thresholds: PSI bins=10, threshold=0.2, ref=52w
+
+# 2026-07-03: Update config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2026-07-04: Add config for drift thresholds: PSI bins=10, threshold=0.2, ref=52w
+
+# 2026-07-05: Config: PSI bins=10, threshold=0.2, ref=52w for drift thresholds
+
+# 2026-07-09: Config: MI k=150, VIF<10, drop constant for feature selection
+
+# 2026-07-09: Add config for champion criteria: skill>baseline+0.01, NSE>0.5, nRMSE<0.3
+
+# 2026-07-12: Config: skill>baseline+0.01, NSE>0.5, nRMSE<0.3 for champion criteria
+
+# 2026-07-12: Add config for drift thresholds: PSI bins=10, threshold=0.2, ref=52w
+
+# 2026-07-16: Update config: PSI bins=10, threshold=0.2, ref=52w
+
+# 2026-07-17: Add config for CV strategy: initial_train=104w, step=2w, gap=1w
+
+# 2026-07-19: Config: PSI bins=10, threshold=0.2, ref=52w for drift thresholds
