@@ -1,0 +1,137 @@
+name: Daily Data Ingestion
+
+on:
+  schedule:
+    # Run daily at 6:00 AM UTC (after ENTSO-E data is typically available)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: 'Start date (YYYY-MM-DD), defaults to yesterday'
+        required: false
+      end_date:
+        description: 'End date (YYYY-MM-DD), defaults to today'
+        required: false
+      force:
+        description: 'Force re-ingestion even if data exists'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.11'
+  POETRY_VERSION: '1.8'
+
+jobs:
+  ingest:
+    name: Ingest ENTSO-E, Weather, BFE Data
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    permissions:
+      contents: read
+      id-token: write  # For OIDC token to access cloud resources
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for DVC
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'poetry'
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+      
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+      
+      - name: Install project
+        run: poetry install --no-interaction
+      
+      # Configure DVC remote (using OIDC for AWS/GCS/Azure)
+      - name: Configure DVC remote
+        run: |
+          poetry run python -m hydro_forecast_pt.mlops.dvc_utils configure-remote
+        env:
+          # These should be set as repository secrets
+          DVC_REMOTE_URL: ${{ secrets.DVC_REMOTE_URL }}
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      
+      - name: Pull latest data from DVC
+        run: |
+          poetry run dvc pull
+        env:
+          DVC_REMOTE_URL: ${{ secrets.DVC_REMOTE_URL }}
+      
+      - name: Run daily ingestion
+        run: |
+          poetry run python -m hydro_forecast_pt.mlops.retrain ingest \
+            --start-date "${{ github.event.inputs.start_date }}" \
+            --end-date "${{ github.event.inputs.end_date }}" \
+            ${FORCE_FLAG}
+        env:
+          FORCE_FLAG: ${{ github.event.inputs.force == 'true' && '--force' || '' }}
+          # API credentials as secrets
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+          CDS_API_KEY: ${{ secrets.CDS_API_KEY }}
+          CDS_API_URL: ${{ secrets.CDS_API_URL }}
+      
+      - name: Push updated data to DVC
+        run: |
+          poetry run dvc add data/raw/
+          poetry run dvc push
+        env:
+          DVC_REMOTE_URL: ${{ secrets.DVC_REMOTE_URL }}
+      
+      - name: Commit and push DVC changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ data/.gitignore
+          if ! git diff --staged --quiet; then
+            git commit -m "chore(data): daily ingestion update [$(date +'%Y-%m-%d')]"
+            git push
+          else
+            echo "No data changes to commit"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "⚠️ Daily ingestion failed for hydro-forecast-ch",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Daily Ingestion Failed*\nRepository: ${{ github.repository }}\nRun: ${{ github.run_id }}\nCheck <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|logs> for details."
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
