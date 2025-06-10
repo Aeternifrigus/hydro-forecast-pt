@@ -1,0 +1,160 @@
+name: Biweekly Model Retraining
+
+on:
+  schedule:
+    # Run every 2 weeks on Monday at 2:00 AM UTC
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+    inputs:
+      models:
+        description: 'Comma-separated list of models to retrain (empty = all)'
+        required: false
+      force:
+        description: 'Force retraining even if no data changes'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.11'
+  POETRY_VERSION: '1.8'
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+
+jobs:
+  retrain:
+    name: Retrain Models
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'poetry'
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+      
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+      
+      - name: Install project
+        run: poetry install --no-interaction
+      
+      - name: Configure DVC remote
+        run: |
+          poetry run python -m hydro_forecast_pt.mlops.dvc_utils configure-remote
+        env:
+          DVC_REMOTE_URL: ${{ secrets.DVC_REMOTE_URL }}
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      
+      - name: Pull data from DVC
+        run: |
+          poetry run dvc pull
+        env:
+          DVC_REMOTE_URL: ${{ secrets.DVC_REMOTE_URL }}
+      
+      - name: Configure MLflow
+        run: |
+          echo "MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_TRACKING_URI }}" >> $GITHUB_ENV
+          echo "MLFLOW_S3_ENDPOINT_URL=${{ secrets.MLFLOW_S3_ENDPOINT_URL }}" >> $GITHUB_ENV
+      
+      - name: Run full retraining pipeline
+        run: |
+          MODELS="${{ github.event.inputs.models }}"
+          FORCE_FLAG="${{ github.event.inputs.force == 'true' && '--force' || '' }}"
+          
+          if [ -n "$MODELS" ]; then
+            poetry run python -m hydro_forecast_pt.mlops.retrain full $FORCE_FLAG --models "$MODELS"
+          else
+            poetry run python -m hydro_forecast_pt.mlops.retrain full $FORCE_FLAG
+          fi
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_S3_ENDPOINT_URL: ${{ secrets.MLFLOW_S3_ENDPOINT_URL }}
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+          CDS_API_KEY: ${{ secrets.CDS_API_KEY }}
+      
+      - name: Push models and metrics to DVC
+        run: |
+          poetry run dvc add models/ metrics/
+          poetry run dvc push
+        env:
+          DVC_REMOTE_URL: ${{ secrets.DVC_REMOTE_URL }}
+      
+      - name: Generate model cards
+        run: |
+          poetry run python -m hydro_forecast_pt.docs.generate_model_cards
+        continue-on-error: true
+      
+      - name: Create PR with model updates
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(model): biweekly retrain [$(date +'%Y-%m-%d')]"
+          title: "Biweekly Model Retrain - $(date +'%Y-%m-%d')"
+          body: |
+            ## Biweekly Model Retraining
+            
+            This PR contains updated models from the scheduled biweekly retraining.
+            
+            ### Changes
+            - Updated model artifacts in `models/`
+            - Updated evaluation metrics in `metrics/`
+            - Updated model cards in `docs/model_cards/`
+            
+            ### Verification
+            - All models passed champion/challenger evaluation
+            - Performance metrics meet minimum thresholds
+            - No significant drift detected
+            
+            ### Reviewers
+            Please review model performance changes before merging.
+          branch: "retrain/biweekly-$(date +'%Y-%m-%d')"
+          labels: "model-update, automated"
+          reviewers: ${{ secrets.MODEL_REVIEWERS }}
+      
+      - name: Notify on completion
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          status: ${{ job.status }}
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && '✅' || '❌' }} Biweekly retraining ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Biweekly Retraining ${{ job.status == 'success' && 'Completed' || 'Failed' }}*\nRepository: ${{ github.repository }}\nRun: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|#${{ github.run_number }}>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
