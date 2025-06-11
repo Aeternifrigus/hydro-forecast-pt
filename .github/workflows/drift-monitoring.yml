@@ -1,0 +1,206 @@
+name: Drift Monitoring
+
+on:
+  schedule:
+    # Run daily at 8:00 AM UTC (after daily ingestion completes)
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    inputs:
+      alert_threshold:
+        description: 'Alert threshold for drift detection'
+        required: false
+        default: 'warning'
+
+env:
+  PYTHON_VERSION: '3.11'
+  POETRY_VERSION: '1.8'
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+
+jobs:
+  drift-check:
+    name: Check Feature, Prediction, and Performance Drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'poetry'
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+      
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+      
+      - name: Install project
+        run: poetry install --no-interaction
+      
+      - name: Configure DVC remote
+        run: |
+          poetry run python -m hydro_forecast_pt.mlops.dvc_utils configure-remote
+        env:
+          DVC_REMOTE_URL: ${{ secrets.DVC_REMOTE_URL }}
+      
+      - name: Pull latest data and models from DVC
+        run: |
+          poetry run dvc pull
+        env:
+          DVC_REMOTE_URL: ${{ secrets.DVC_REMOTE_URL }}
+      
+      - name: Run drift detection
+        id: drift
+        run: |
+          poetry run python -m hydro_forecast_pt.mlops.drift_check \
+            --output drift_report.json \
+            --threshold ${{ github.event.inputs.alert_threshold }}
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_S3_ENDPOINT_URL: ${{ secrets.MLFLOW_S3_ENDPOINT_URL }}
+      
+      - name: Upload drift report
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-report
+          path: drift_report.json
+          retention-days: 30
+      
+      - name: Check for alerts
+        id: alerts
+        run: |
+          python -c "
+          import json
+          with open('drift_report.json') as f:
+            report = json.load(f)
+          
+          summary = report.get('summary', {})
+          n_alerts = summary.get('n_alerts', 0)
+          status = summary.get('status', 'OK')
+          alerts = summary.get('alerts', [])
+          
+          print(f'n_alerts={n_alerts}')
+          print(f'status={status}')
+          
+          # Write alerts to file for next step
+          with open('alerts.txt', 'w') as f:
+            for alert in alerts:
+              f.write(f'- {alert}\n')
+          
+          # Set output for conditional steps
+          if n_alerts > 0:
+            print('has_alerts=true')
+          else:
+            print('has_alerts=false')
+          " >> $GITHUB_OUTPUT
+      
+      - name: Create GitHub Issue for alerts
+        if: steps.alerts.outputs.has_alerts == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const alerts = fs.readFileSync('alerts.txt', 'utf8');
+            
+            const title = `🚨 Drift Alert: ${process.env.GITHUB_REPOSITORY} - ${new Date().toISOString().split('T')[0]}`;
+            const body = `## Drift Detection Alert\n\n**Repository:** ${process.env.GITHUB_REPOSITORY}\n**Run:** ${process.env.GITHUB_RUN_ID}\n**Date:** ${new Date().toISOString()}\n\n### Alerts\n${alerts}\n\n---\n*Automated drift monitoring. Check the workflow run for full report.*`;
+            
+            const { data: existingIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: ['drift-alert'],
+              per_page: 10,
+            });
+            
+            // Check if there's already an open issue from today
+            const today = new Date().toISOString().split('T')[0];
+            const existingToday = existingIssues.find(issue => 
+              issue.title.includes(today) && issue.labels.some(l => l.name === 'drift-alert')
+            );
+            
+            if (existingToday) {
+              // Update existing issue
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingToday.number,
+                body: body,
+              });
+              console.log('Updated existing drift alert issue');
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['drift-alert', 'automated'],
+              });
+              console.log('Created new drift alert issue');
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Send Slack notification for critical alerts
+        if: steps.alerts.outputs.status == 'CRITICAL'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🔴 CRITICAL: Drift detected in hydro-forecast-ch",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*CRITICAL Drift Alert*\nRepository: ${{ github.repository }}\nRun: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|#${{ github.run_number }}>\n\n${{ steps.alerts.outputs.alerts_text || 'Multiple drift alerts detected. Check GitHub issue for details.' }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: Send Slack notification for warnings
+        if: steps.alerts.outputs.status == 'WARNING'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "⚠️ WARNING: Drift detected in hydro-forecast-ch",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Warning: Drift Detected*\nRepository: ${{ github.repository }}\nRun: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|#${{ github.run_number }}>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
